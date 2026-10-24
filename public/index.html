@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101827">
+  <title>RiskControl — Панель рисков</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="/qr.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/">
+      <span class="brand-icon">R</span>
+      <span>Risk<span class="brand-accent">Control</span></span>
+    </a>
+
+    <div class="nav-caption">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+    <nav class="navigation">
+      <a class="nav-link active" href="#dashboard">▦ Обзор рисков</a>
+      <a class="nav-link" href="#risk-chart">◉ Аналитика</a>
+      <a class="nav-link" href="#incidents">▤ Последние</a>
+      <a class="nav-link" href="#registry">☰ Реестр</a>
+      <a class="nav-link" href="#add-risk">＋ Добавить риск</a>
+      <a class="nav-link" href="/qr.html" target="_blank">▣ QR-код сайта</a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="connection-indicator">
+        <span class="status-dot"></span>
+        <div>
+          <strong>RiskControl</strong>
+          <small id="connection-text">Проверка подключения...</small>
+        </div>
+      </div>
+      <div class="sidebar-footer">RiskControl · Big Data</div>
+    </div>
+  </aside>
+
+  <main class="main-content" id="dashboard">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">АНАЛИТИКА И МОНИТОРИНГ</div>
+        <h1>Обзор рисков</h1>
+        <p class="page-subtitle">Контроль сигналов, инцидентов и оценок риска</p>
+      </div>
+      <div class="topbar-actions">
+        <span class="live-label">● Онлайн</span>
+        <button class="button button-secondary" id="qr-button" type="button">▣ QR-код</button>
+        <button class="button button-secondary" id="refresh-button" type="button">↻ Обновить</button>
+        <button class="button panic-button" id="panic-button" type="button">
+          <span class="panic-pulse"></span>🚨 Тревожная кнопка
+        </button>
+      </div>
+    </header>
+
+    <div class="error-banner" id="error-banner" role="alert" hidden></div>
+    <div class="success-banner" id="success-banner" role="status" hidden></div>
+
+    <!-- ОСНОВНЫЕ ПОКАЗАТЕЛИ -->
+    <section class="metrics-grid">
+      <article class="metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Всего инцидентов</span>
+          <span class="metric-icon icon-blue">▤</span>
+        </div>
+        <div class="metric-value" id="total-incidents">—</div>
+        <div class="metric-note">Все зарегистрированные сигналы</div>
+      </article>
+      <article class="metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Высокий риск</span>
+          <span class="metric-icon icon-red">!</span>
+        </div>
+        <div class="metric-value" id="high-risk">—</div>
+        <div class="metric-note">Балл оценки 70 и выше</div>
+      </article>
+      <article class="metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Новые инциденты</span>
+          <span class="metric-icon icon-amber">◷</span>
+        </div>
+        <div class="metric-value" id="new-incidents">—</div>
+        <div class="metric-note">Ожидают обработки</div>
+      </article>
+      <article class="metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Средний балл риска</span>
+          <span class="metric-icon icon-purple">◎</span>
+        </div>
+        <div class="metric-value" id="average-score">—</div>
+        <div class="metric-note">Из 100 баллов</div>
+      </article>
+    </section>
+
+    <section class="secondary-metrics">
+      <div class="secondary-metric"><span>Общая сумма</span><strong id="total-amount">—</strong></div>
+      <div class="secondary-metric"><span>Оценено инцидентов</span><strong id="assessed-incidents">—</strong></div>
+      <div class="secondary-metric"><span>На рассмотрении</span><strong id="review-incidents">—</strong></div>
+      <div class="secondary-metric"><span>Решено и закрыто</span><strong id="resolved-incidents">—</strong></div>
+    </section>
+
+    <!-- ГРАФИКИ -->
+    <section class="charts-grid">
+      <article class="panel chart-panel" id="risk-chart">
+        <div class="panel-header">
+          <div><h2>Распределение рисков</h2><p>По уровням последней оценки</p></div>
+        </div>
+        <div class="donut-wrap"><canvas id="riskChart"></canvas></div>
+        <div class="chart-legend" id="risk-legend"></div>
+      </article>
+
+      <article class="panel chart-panel">
+        <div class="panel-header">
+          <div><h2>Приоритеты инцидентов</h2><p>Распределение по срочности</p></div>
+        </div>
+        <div class="bar-chart-wrap"><canvas id="priorityChart"></canvas></div>
+      </article>
+
+      <article class="panel trend-panel">
+        <div class="panel-header">
+          <div><h2>Динамика инцидентов</h2><p>Регистрация по месяцам</p></div>
+          <span class="panel-tag">12 месяцев</span>
+        </div>
+        <div class="trend-chart-wrap"><canvas id="trendChart"></canvas></div>
+      </article>
+
+      <article class="panel trend-panel">
+        <div class="panel-header">
+          <div><h2>Риски по категориям</h2><p>Количество сигналов и средний балл риска по каждой категории</p></div>
+        </div>
+        <div class="bar-chart-wrap"><canvas id="categoryChart"></canvas></div>
+      </article>
+    </section>
+
+    <!-- ПОСЛЕДНИЕ ИНЦИДЕНТЫ -->
+    <section class="panel incidents-panel" id="incidents">
+      <div class="panel-header incidents-heading">
+        <div><h2>Последние инциденты</h2><p>10 самых свежих сигналов</p></div>
+        <a class="panel-link" href="#add-risk">＋ Добавить риск</a>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Дата</th><th>Категория</th><th>Описание</th><th>Сумма</th>
+                <th>Приоритет</th><th>Статус</th><th>Риск</th><th>Балл</th></tr>
+          </thead>
+          <tbody id="incidents-body">
+            <tr><td colspan="9" class="table-message">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span id="last-updated">Ожидание данных</span>
+        <span id="analytics-status">Источник: PostgreSQL · RiskControl API</span>
+      </div>
+    </section>
+
+    <!-- РЕЕСТР ВСЕХ ИНЦИДЕНТОВ -->
+    <section class="panel incidents-panel" id="registry">
+      <div class="panel-header incidents-heading">
+        <div>
+          <h2>Реестр всех инцидентов</h2>
+          <p>Постраничный просмотр всей базы с фильтрами</p>
+        </div>
+        <span class="panel-tag" id="registry-total">—</span>
+      </div>
+
+      <form class="filters" id="registry-filters">
+        <select name="type">
+          <option value="">Все категории</option>
+          <option value="ГСМ">ГСМ</option><option value="платёж">Платёж</option>
+          <option value="поставщик">Поставщик</option><option value="договор">Договор</option>
+          <option value="техника">Техника</option><option value="другое">Другое</option>
+        </select>
+        <select name="priority">
+          <option value="">Все приоритеты</option>
+          <option value="critical">Критический</option><option value="high">Высокий</option>
+          <option value="medium">Средний</option><option value="low">Низкий</option>
+        </select>
+        <select name="status">
+          <option value="">Все статусы</option>
+          <option value="new">Новый</option><option value="assigned">Назначен</option>
+          <option value="in_review">На рассмотрении</option><option value="resolved">Решён</option>
+          <option value="closed">Закрыт</option><option value="rejected">Отклонён</option>
+        </select>
+      </form>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Дата</th><th>Категория</th><th>Описание</th><th>Сумма</th>
+                <th>Приоритет</th><th>Статус</th><th>Риск</th><th>Балл</th></tr>
+          </thead>
+          <tbody id="registry-body">
+            <tr><td colspan="9" class="table-message">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <button class="button button-secondary" id="prev-page" type="button" disabled>← Назад</button>
+        <span id="page-info">Страница 1</span>
+        <button class="button button-secondary" id="next-page" type="button" disabled>Вперёд →</button>
+      </div>
+    </section>
+
+    <!-- ПОЛНАЯ ФОРМА ДОБАВЛЕНИЯ РИСКА -->
+    <section class="panel full-risk-form" id="add-risk">
+      <div class="panel-header">
+        <div>
+          <h2>Добавление риска</h2>
+          <p>Система сама оценит риск по категории, сумме и описанию и назначит приоритет</p>
+        </div>
+        <span class="panel-tag">Новый инцидент</span>
+      </div>
+
+      <form id="full-risk-form">
+        <div class="form-grid">
+          <label>
+            Категория риска *
+            <select name="incident_type" required>
+              <option value="">Выбери категорию</option>
+              <option value="ГСМ">ГСМ</option><option value="платёж">Платёж</option>
+              <option value="поставщик">Поставщик</option><option value="договор">Договор</option>
+              <option value="техника">Техника</option><option value="другое">Другое</option>
+            </select>
+          </label>
+          <label>
+            Сумма ущерба или операции, ₽
+            <input type="number" name="amount" min="0" step="0.01" value="0">
+          </label>
+          <label class="form-full">
+            Подробное описание риска *
+            <textarea name="description" minlength="10" maxlength="3000" rows="6" required
+              placeholder="Что произошло или может произойти, какие обстоятельства вызывают подозрение, возможные последствия..."></textarea>
+            <small>От 10 до 3000 символов.</small>
+          </label>
+        </div>
+        <button class="button button-primary" id="full-risk-submit" type="submit">＋ Зарегистрировать риск</button>
+      </form>
+    </section>
+
+    <footer class="page-footer">
+      <span>RiskControl</span>
+      <span>Мониторинг рисков и контроль инцидентов</span>
+    </footer>
+  </main>
+</div>
+
+<!-- ОКНО ТРЕВОЖНОЙ КНОПКИ -->
+<div class="modal-backdrop" id="panic-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="panic-title">
+    <div class="modal-head">
+      <h2 id="panic-title">🚨 Тревожный сигнал</h2>
+      <button class="modal-close" id="panic-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <p class="modal-text">Выбери категорию — сигнал сразу уйдёт с <b>критическим приоритетом</b>. Остальные поля можно не заполнять.</p>
+
+    <div class="panic-grid" id="panic-types">
+      <button type="button" data-type="ГСМ">⛽<span>ГСМ</span></button>
+      <button type="button" data-type="платёж">💳<span>Платёж</span></button>
+      <button type="button" data-type="поставщик">🏢<span>Поставщик</span></button>
+      <button type="button" data-type="договор">📄<span>Договор</span></button>
+      <button type="button" data-type="техника">🚜<span>Техника</span></button>
+      <button type="button" data-type="другое">⚠️<span>Другое</span></button>
+    </div>
+
+    <label class="modal-field">Сумма, ₽ (необязательно)
+      <input type="number" id="panic-amount" min="0" step="0.01" placeholder="0">
+    </label>
+    <label class="modal-field">Комментарий (необязательно)
+      <textarea id="panic-comment" rows="2" maxlength="2900" placeholder="Коротко: что случилось"></textarea>
+    </label>
+    <div class="modal-message" id="panic-message" hidden></div>
+  </div>
+</div>
+
+<!-- ОКНО С QR-КОДОМ -->
+<div class="modal-backdrop" id="qr-modal" hidden>
+  <div class="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
+    <div class="modal-head">
+      <h2 id="qr-title" class="qr-title">Открыть на телефоне</h2>
+      <button class="modal-close" id="qr-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <p class="modal-text">Наведи камеру телефона на код — откроется эта панель с тревожной кнопкой.</p>
+    <div class="qr-box" id="qr-box"></div>
+    <div class="qr-url" id="qr-url"></div>
+    <a class="button button-primary qr-print" href="/qr.html" target="_blank">Открыть для печати</a>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const numberFormat = new Intl.NumberFormat("ru-RU");
+const moneyFormat = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 });
+
+const riskColors = { "Высокий риск": "#ef4444", "Средний риск": "#f59e0b", "Низкий риск": "#10b981" };
+const priorityLabels = { critical: "Критический", high: "Высокий", medium: "Средний", low: "Низкий" };
+const priorityColors = { critical: "#ef4444", high: "#f97316", medium: "#f59e0b", low: "#10b981" };
+const statusLabels = { new: "Новый", assigned: "Назначен", in_review: "На рассмотрении",
+                       resolved: "Решён", closed: "Закрыт", rejected: "Отклонён" };
+
+const charts = {};
+let loadingDashboard = false;
+
+const $ = (id) => document.getElementById(id);
+const fmtNumber = (v) => numberFormat.format(Number(v || 0));
+const fmtMoney = (v) => moneyFormat.format(Number(v || 0));
+const fmtCompactMoney = (v) => {
+  const n = Number(v || 0);
+  if (n >= 1e12) return (n / 1e12).toLocaleString("ru-RU", { maximumFractionDigits: 2 }) + " трлн ₽";
+  if (n >= 1e9)  return (n / 1e9).toLocaleString("ru-RU", { maximumFractionDigits: 2 }) + " млрд ₽";
+  if (n >= 1e6)  return (n / 1e6).toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + " млн ₽";
+  return fmtMoney(n);
+};
+
+function banner(id, text) { $(id).textContent = text; $(id).hidden = !text; }
+const showError = (t) => banner("error-banner", t);
+const showSuccess = (t) => banner("success-banner", t);
+
+function formatDate(v) {
+  if (!v) return "—";
+  return new Date(v).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+function formatMonth(v) {
+  const m = String(v || "").match(/^(\d{4})-(\d{2})/);
+  const d = m ? new Date(+m[1], +m[2] - 1, 1) : new Date(v);
+  return d.toLocaleDateString("ru-RU", { month: "short", year: "2-digit" }).replace(".", "");
+}
+
+function baseOptions() {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: "#101827", padding: 12 } }
+  };
+}
+function drawChart(key, canvasId, config) {
+  if (typeof Chart === "undefined") return; // CDN недоступен — цифры и таблицы всё равно покажем
+  if (charts[key]) charts[key].destroy();
+  charts[key] = new Chart($(canvasId), config);
+}
+const axis = (extra = {}) => ({
+  grid: { color: "#edf0f5" }, border: { display: false },
+  ticks: { color: "#8490a3", callback: (v) => fmtNumber(v) }, ...extra
+});
+
+function renderRiskChart(rows) {
+  const labels = rows.map(r => r.risk_level);
+  const values = rows.map(r => Number(r.incident_count));
+  drawChart("risk", "riskChart", {
+    type: "doughnut",
+    data: { labels, datasets: [{ data: values, backgroundColor: labels.map(l => riskColors[l] || "#94a3b8"),
+                                 borderColor: "#fff", borderWidth: 4, hoverOffset: 5 }] },
+    options: { ...baseOptions(), cutout: "72%",
+      plugins: { ...baseOptions().plugins,
+        tooltip: { callbacks: { label: (c) => `${c.label}: ${fmtNumber(c.raw)} инцидентов` } } } }
+  });
+  const total = values.reduce((s, v) => s + v, 0);
+  const legend = $("risk-legend");
+  legend.replaceChildren(...rows.map((r) => {
+    const line = document.createElement("div"); line.className = "legend-row";
+    const name = document.createElement("span"); name.className = "legend-name";
+    const dot = document.createElement("span"); dot.className = "legend-dot";
+    dot.style.backgroundColor = riskColors[r.risk_level] || "#94a3b8";
+    const text = document.createElement("span"); text.textContent = r.risk_level;
+    name.append(dot, text);
+    const val = document.createElement("strong");
+    const pct = total ? (r.incident_count * 100 / total).toLocaleString("ru-RU", { maximumFractionDigits: 1 }) : "0";
+    val.textContent = `${fmtNumber(r.incident_count)} · ${pct}%`;
+    line.append(name, val);
+    return line;
+  }));
+}
+
+function renderPriorityChart(rows) {
+  const order = ["critical", "high", "medium", "low"];
+  const sorted = [...rows].sort((a, b) => order.indexOf(a.priority) - order.indexOf(b.priority));
+  drawChart("priority", "priorityChart", {
+    type: "bar",
+    data: { labels: sorted.map(r => priorityLabels[r.priority] || r.priority),
+      datasets: [{ label: "Инциденты", data: sorted.map(r => Number(r.incident_count)),
+        backgroundColor: sorted.map(r => priorityColors[r.priority] || "#64748b"), borderRadius: 6, maxBarThickness: 42 }] },
+    options: { ...baseOptions(), indexAxis: "y",
+      scales: { x: axis({ beginAtZero: true }), y: { grid: { display: false }, border: { display: false }, ticks: { color: "#526078" } } } }
+  });
+}
+
+function renderTrendChart(rows) {
+  drawChart("trend", "trendChart", {
+    type: "line",
+    data: { labels: rows.map(r => formatMonth(r.month)),
+      datasets: [{ label: "Инциденты", data: rows.map(r => Number(r.incident_count)),
+        borderColor: "#4169e1", backgroundColor: "rgba(65,105,225,0.10)", fill: true,
+        tension: 0.32, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 5 }] },
+    options: { ...baseOptions(),
+      scales: { x: { grid: { display: false }, border: { display: false }, ticks: { color: "#8490a3", maxRotation: 0 } },
+                y: axis({ beginAtZero: true }) } }
+  });
+}
+
+function renderCategoryChart(rows) {
+  drawChart("category", "categoryChart", {
+    type: "bar",
+    data: { labels: rows.map(r => r.incident_type),
+      datasets: [{ label: "Инциденты", data: rows.map(r => Number(r.incident_count)),
+        backgroundColor: "#4169e1", borderRadius: 6, maxBarThickness: 56 }] },
+    options: { ...baseOptions(),
+      plugins: { ...baseOptions().plugins, tooltip: { backgroundColor: "#101827", padding: 12, callbacks: {
+        afterLabel: (c) => {
+          const r = rows[c.dataIndex];
+          return `Средний балл: ${r.average_score ?? "—"}\nСумма: ${fmtCompactMoney(r.total_amount)}`;
+        } } } },
+      scales: { x: { grid: { display: false }, border: { display: false }, ticks: { color: "#526078" } },
+                y: axis({ beginAtZero: true }) } }
+  });
+}
+
+function badge(text, cls) {
+  const el = document.createElement("span");
+  el.className = `badge ${cls}`;
+  el.textContent = text || "—";
+  return el;
+}
+function riskClass(level) {
+  return { "Высокий риск": "risk-high", "Средний риск": "risk-medium", "Низкий риск": "risk-low" }[level] || "risk-none";
+}
+
+function renderRows(tbodyId, rows, emptyText) {
+  const tbody = $(tbodyId);
+  tbody.replaceChildren();
+  if (!rows.length) {
+    const tr = document.createElement("tr"); const td = document.createElement("td");
+    td.colSpan = 9; td.className = "table-message"; td.textContent = emptyText;
+    tr.append(td); tbody.append(tr); return;
+  }
+  for (const inc of rows) {
+    const tr = document.createElement("tr");
+    const cell = (v, cls = "") => { const td = document.createElement("td"); td.textContent = v ?? "—"; if (cls) td.className = cls; return td; };
+    const wrap = (el) => { const td = document.createElement("td"); td.append(el); return td; };
+    const desc = cell(inc.description, "description-cell"); desc.title = inc.description || "";
+    tr.append(
+      cell(`#${inc.incident_id}`, "id-cell"),
+      cell(formatDate(inc.created_at)),
+      cell(inc.incident_type),
+      desc,
+      cell(inc.amount == null ? "—" : fmtMoney(inc.amount), "amount-cell"),
+      wrap(badge(priorityLabels[inc.priority] || inc.priority, `priority-${inc.priority}`)),
+      wrap(badge(statusLabels[inc.status] || inc.status, `status-${inc.status}`)),
+      wrap(badge(inc.risk_level || "Нет оценки", riskClass(inc.risk_level))),
+      cell(inc.score == null ? "—" : `${inc.score}/100`, "score-cell")
+    );
+    tbody.append(tr);
+  }
+}
+
+async function api(url, options = {}) {
+  const res = await fetch(url, { cache: "no-store", headers: { Accept: "application/json", ...(options.headers || {}) }, ...options });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function loadDashboard() {
+  if (loadingDashboard) return;
+  loadingDashboard = true;
+  $("refresh-button").disabled = true;
+  try {
+    const data = await api("/api/dashboard");
+    const s = data.summary;
+    $("total-incidents").textContent = fmtNumber(s.total_incidents);
+    $("high-risk").textContent = fmtNumber(s.high_risk_incidents);
+    $("new-incidents").textContent = fmtNumber(s.new_incidents);
+    $("average-score").textContent = Number(s.average_score || 0).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    $("total-amount").textContent = fmtCompactMoney(s.total_amount);
+    $("assessed-incidents").textContent = fmtNumber(s.assessed_incidents);
+    $("review-incidents").textContent = fmtNumber(s.in_review_incidents);
+    $("resolved-incidents").textContent = fmtNumber(s.resolved_incidents);
+
+    renderRiskChart(data.riskDistribution || []);
+    renderPriorityChart(data.priorityDistribution || []);
+    renderTrendChart(data.monthlyTrend || []);
+    renderCategoryChart(data.categoryDistribution || []);
+    renderRows("incidents-body", data.recentIncidents || [], "Инциденты пока не зарегистрированы");
+
+    const a = data.analytics || {};
+    $("last-updated").textContent = `Обновлено: ${new Date().toLocaleString("ru-RU")}`;
+    $("analytics-status").textContent = a.refreshing
+      ? "Аналитика пересчитывается…"
+      : a.pending_incidents > 0
+        ? `Новых сигналов ждут пересчёта: ${a.pending_incidents}`
+        : a.refreshed_at ? `Аналитика пересчитана: ${formatDate(a.refreshed_at)}` : "Аналитика готовится…";
+    $("connection-text").textContent = "PostgreSQL подключена";
+    showError("");
+  } catch (e) {
+    console.error(e);
+    showError(`Не удалось загрузить дашборд: ${e.message}`);
+    $("connection-text").textContent = "Ошибка загрузки";
+  } finally {
+    loadingDashboard = false;
+    $("refresh-button").disabled = false;
+  }
+}
+
+// ---------- Реестр: постраничный просмотр по курсору ----------
+const registry = { cursors: [null], page: 0, next: null };
+
+async function loadRegistry() {
+  const f = new FormData($("registry-filters"));
+  const params = new URLSearchParams({ limit: 20 });
+  for (const k of ["type", "priority", "status"]) if (f.get(k)) params.set(k, f.get(k));
+  const cursor = registry.cursors[registry.page];
+  if (cursor) params.set("before", cursor);
+
+  $("registry-body").style.opacity = 0.5;
+  try {
+    const data = await api(`/api/incidents?${params}`);
+    renderRows("registry-body", data.items, "По этим фильтрам ничего не найдено");
+    registry.next = data.next_cursor;
+    const pages = Math.max(1, Math.ceil(data.total / 20));
+    $("registry-total").textContent = `Найдено: ${fmtNumber(data.total)}`;
+    $("page-info").textContent = `Страница ${fmtNumber(registry.page + 1)} из ${fmtNumber(pages)}`;
+    $("prev-page").disabled = registry.page === 0;
+    $("next-page").disabled = !registry.next;
+  } catch (e) {
+    showError(`Не удалось загрузить реестр: ${e.message}`);
+  } finally {
+    $("registry-body").style.opacity = 1;
+  }
+}
+$("registry-filters").addEventListener("change", () => { registry.cursors = [null]; registry.page = 0; loadRegistry(); });
+$("next-page").addEventListener("click", () => {
+  if (!registry.next) return;
+  registry.page++; registry.cursors[registry.page] = registry.next; loadRegistry();
+});
+$("prev-page").addEventListener("click", () => {
+  if (registry.page === 0) return;
+  registry.page--; loadRegistry();
+});
+
+// ---------- Отправка сигнала (общая для формы и тревожной кнопки) ----------
+async function sendIncident(payload) {
+  const { incident } = await api("/api/incidents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  showSuccess(`Сигнал #${incident.incident_id} зарегистрирован · ${incident.risk_level}, ${incident.score}/100 · приоритет: ${priorityLabels[incident.priority]}`);
+  await loadDashboard();
+  registry.cursors = [null]; registry.page = 0; loadRegistry();
+  setTimeout(loadDashboard, 8000); // к этому времени аналитика успеет пересчитаться
+  return incident;
+}
+
+$("full-risk-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  if (!form.reportValidity()) return;
+  const btn = $("full-risk-submit");
+  btn.disabled = true; btn.textContent = "Сохранение...";
+  try {
+    await sendIncident({
+      incident_type: form.elements.incident_type.value,
+      description: form.elements.description.value.trim(),
+      amount: form.elements.amount.value || 0
+    });
+    form.reset(); form.elements.amount.value = "0";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "＋ Зарегистрировать риск";
+  }
+});
+
+// ---------- Тревожная кнопка ----------
+const modal = $("panic-modal");
+function openPanic() {
+  $("panic-amount").value = ""; $("panic-comment").value = "";
+  $("panic-message").hidden = true;
+  modal.hidden = false;
+  modal.querySelector("[data-type]").focus();
+}
+function closePanic() { modal.hidden = true; }
+$("panic-button").addEventListener("click", openPanic);
+$("panic-close").addEventListener("click", closePanic);
+modal.addEventListener("click", (e) => { if (e.target === modal) closePanic(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.hidden) closePanic(); });
+
+$("panic-types").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-type]");
+  if (!btn) return;
+  const buttons = $("panic-types").querySelectorAll("button");
+  buttons.forEach(b => b.disabled = true);
+  btn.classList.add("sending");
+  try {
+    await sendIncident({
+      panic: true,
+      incident_type: btn.dataset.type,
+      amount: $("panic-amount").value || 0,
+      description: $("panic-comment").value.trim()
+    });
+    closePanic();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) {
+    $("panic-message").textContent = err.message;
+    $("panic-message").hidden = false;
+  } finally {
+    buttons.forEach(b => b.disabled = false);
+    btn.classList.remove("sending");
+  }
+});
+
+// ---------- QR-код: адрес берётся из текущей страницы, поэтому подходит для любого хостинга ----------
+const qrModal = $("qr-modal");
+$("qr-button").addEventListener("click", () => {
+  const url = location.origin + "/";
+  $("qr-box").innerHTML = QR.svg(url, { size: 240 });
+  $("qr-url").textContent = url;
+  qrModal.hidden = false;
+});
+$("qr-close").addEventListener("click", () => { qrModal.hidden = true; });
+qrModal.addEventListener("click", (e) => { if (e.target === qrModal) qrModal.hidden = true; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") qrModal.hidden = true; });
+
+$("refresh-button").addEventListener("click", loadDashboard);
+
+async function checkConnection() {
+  try {
+    const d = await api("/api/health");
+    $("connection-text").textContent = d.status === "ok" ? "PostgreSQL подключена" : "База данных недоступна";
+  } catch {
+    $("connection-text").textContent = "Сервер недоступен";
+  }
+}
+
+loadDashboard();
+loadRegistry();
+checkConnection();
+setInterval(loadDashboard, 60000);
+</script>
+</body>
+</html>

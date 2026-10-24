@@ -1,0 +1,18 @@
+{
+  "name": "riskcontrol",
+  "version": "2.0.0",
+  "private": true,
+  "description": "RiskControl — мониторинг рисков на 2 млн записей",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "setup-db": "node setup-database.js",
+    "seed": "node seed-2m.js --reset"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "pg": "^8.13.0"
+  }
+}
